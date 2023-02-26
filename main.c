@@ -11,10 +11,21 @@
 #include <time.h>
 #include <unistd.h>
 
+#define RAYGUI_IMPLEMENTATION
+#include "raygui.h"
+
+#include "mathops.h"
 #include "genann_view.h"
 #include "genann.h"
+#include "xor.h"
 
-static struct genann_view *net_viewer = NULL;
+#define MAX_VIEVERS_NUM 4
+static genann_view *net_viewers[MAX_VIEVERS_NUM] = {0};
+static int net_viewers_num = 0;
+
+static genann *ann_xor = NULL;
+static genann *ann_div = NULL;
+
 static const int screen_width = 1920;
 static const int screen_height = 1080;
 
@@ -129,18 +140,52 @@ void camera_process() {
     }
 }
 
-static genann_view *view_test = NULL;
-
 genann_view *printing_test() {
     genann *ann = genann_init(5, 3, 5, 4);
     genann_randomize(ann);
     //genann *ann = genann_init(4, 2, 7, 3);
-    genann_print(ann);
-    genann_print_run(ann);
+    /*genann_print(ann);*/
+    /*genann_print_run(ann);*/
     genann_view *view = genann_view_new("randomized[5, 3, 5, 4]");
     genann_view_prepare(view, ann);
     genann_free(ann);
     return view;
+}
+
+static bool xor_input_mode = true;
+static char xor_input[50] = {0};
+static char xor_result[50] = {0};
+
+void xor_input_process() {
+    Rectangle xor_bounds = {
+        100, 100, 400, 80,
+    };
+    if (GuiTextBox(xor_bounds, xor_input, sizeof(xor_input), xor_input_mode)) {
+        printf("enter\n");
+        int a = 0;
+        int b = 0;
+        assert(ann_xor);
+        if (sscanf(xor_input, "%d %d", &a, &b) == 2) {
+            double inputs[2] = { a, b };
+            const double *outputs = genann_run(ann_xor, inputs);
+            printf("outputs[0] %f\n", outputs[0]);
+            printf("outputs[1] %f\n", outputs[1]);
+            /*
+               if (outputs[0] > 0.5) {
+               strcpy(xor_result, "0");
+               } else {
+               strcpy(xor_result, "1");
+               }
+               */
+            sprintf(xor_result, "%.1f", outputs[0]);
+        } else {
+            strcpy(xor_result, "0");
+        }
+    }
+
+    DrawText(
+        xor_result, xor_bounds.x + xor_bounds.width * 1.5, 100, 20, BLACK
+    );
 }
 
 void update() {
@@ -151,8 +196,15 @@ void update() {
     ClearBackground(RAYWHITE);
 
     Vector2 mouse_point = GetScreenToWorld2D(GetMousePosition(), camera);
-    genann_view_draw(view_test);
-    genann_view_update(view_test, mouse_point);
+
+    for (int i = 0; i < net_viewers_num; i++) {
+        genann_view_draw(net_viewers[i]);
+        genann_view_update(net_viewers[i], mouse_point);
+    }
+
+    xor_input_process();
+
+    /*printf("xor_input: %s\n", xor_input);*/
 
     EndMode2D();
     EndDrawing();
@@ -160,15 +212,45 @@ void update() {
     //usleep(10000);
 }
 
+void viewers_free() {
+    for (int j = 0; j < net_viewers_num; ++j) 
+        genann_view_free(net_viewers[j]);
+}
+
 int main(void) {
     camera.zoom = 1.0f;
     srand(time(NULL));
     InitWindow(screen_width, screen_height, "2048");
 
-    net_viewer = genann_view_new("divider");
-    genann_view_position_set(net_viewer, (Vector2) { 0., -1000. });
+    /*
+    net_viewers[net_viewers_num] = genann_view_new("divider");
+    genann_view_position_set(
+        net_viewers[net_viewers_num], (Vector2) { 0., -1000. }
+    );
+    net_viewers_num++;
 
-    view_test = printing_test();
+    net_viewers[net_viewers_num] = printing_test();
+    genann_view_position_set(
+        net_viewers[net_viewers_num], (Vector2) { 0., -2000. }
+    );
+    net_viewers_num++;
+    */
+
+    net_viewers[net_viewers_num] = genann_view_new("xor");
+    ann_xor = ann_get_xor();
+    genann_view_prepare(net_viewers[net_viewers_num], ann_xor);
+    genann_view_position_set(
+        net_viewers[net_viewers_num], (Vector2) { 0., -2000. }
+    );
+    net_viewers_num++;
+
+    net_viewers[net_viewers_num] = genann_view_new("div");
+    ann_div = ann_get_div();
+    genann_view_prepare(net_viewers[net_viewers_num], ann_div);
+    genann_view_position_set(
+        net_viewers[net_viewers_num], (Vector2) { 0., -3000. }
+    );
+    net_viewers_num++;
 
     SetTargetFPS(60);
 
@@ -177,9 +259,10 @@ int main(void) {
     }
 
     CloseWindow();
-    genann_view_free(net_viewer);
+    genann_view_free(net_viewers[0]);
 
-    genann_view_free(view_test);
-
+    viewers_free();
+    genann_free(ann_xor);
+    genann_free(ann_div);
     return 0;
 }
