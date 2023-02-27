@@ -18,21 +18,20 @@
 #include "genann_view.h"
 #include "genann.h"
 #include "xor.h"
+#include "logger.h"
 
 #define MAX_VIEVERS_NUM 4
-static genann_view *net_viewers[MAX_VIEVERS_NUM] = {0};
-static int net_viewers_num = 0;
+static genann_view *viewers[MAX_VIEVERS_NUM] = {0};
+static int viewers_num = 0;
 
 static genann *ann_xor = NULL;
 static genann *ann_div = NULL;
+static genann *ann_test = NULL;
 
 static const int screen_width = 1920;
 static const int screen_height = 1080;
 
 static Camera2D camera = { 0 };
-
-void input() {
-}
 
 Vector2 place_center(const char *text, int fontsize) {
     float width = MeasureText(text, fontsize);
@@ -197,12 +196,12 @@ void update() {
 
     Vector2 mouse_point = GetScreenToWorld2D(GetMousePosition(), camera);
 
-    for (int i = 0; i < net_viewers_num; i++) {
-        genann_view_draw(net_viewers[i]);
-        genann_view_update(net_viewers[i], mouse_point);
+    for (int i = 0; i < viewers_num; i++) {
+        genann_view_draw(viewers[i]);
+        genann_view_update(viewers[i], mouse_point);
     }
 
-    xor_input_process();
+    /*xor_input_process();*/
 
     /*printf("xor_input: %s\n", xor_input);*/
 
@@ -213,44 +212,43 @@ void update() {
 }
 
 void viewers_free() {
-    for (int j = 0; j < net_viewers_num; ++j) 
-        genann_view_free(net_viewers[j]);
+    for (int j = 0; j < viewers_num; ++j) 
+        genann_view_free(viewers[j]);
+}
+
+void anns_init() {
+    viewers[viewers_num] = genann_view_new("test[5,3,5,4]");
+    ann_test = genann_init(5, 3, 5, 4);
+    genann_view_position_set(
+        viewers[viewers_num], (Vector2) { 0., 0. }
+    );
+    genann_view_prepare(viewers[viewers_num], ann_test);
+    viewers_num++;
+
+    viewers[viewers_num] = genann_view_new("xor");
+    ann_xor = ann_get_xor();
+    genann_view_position_set(
+            viewers[viewers_num], (Vector2) { 1000., -300. }
+    );
+    genann_view_prepare(viewers[viewers_num], ann_xor);
+    viewers_num++;
+
+    viewers[viewers_num] = genann_view_new("div");
+    ann_div = ann_get_div();
+    genann_view_position_set(
+            viewers[viewers_num], (Vector2) { -100., -800. }
+    );
+    genann_view_prepare(viewers[viewers_num], ann_div);
+    viewers_num++;
 }
 
 int main(void) {
     camera.zoom = 1.0f;
     srand(time(NULL));
+    logger_init();
     InitWindow(screen_width, screen_height, "2048");
 
-    /*
-    net_viewers[net_viewers_num] = genann_view_new("divider");
-    genann_view_position_set(
-        net_viewers[net_viewers_num], (Vector2) { 0., -1000. }
-    );
-    net_viewers_num++;
-
-    net_viewers[net_viewers_num] = printing_test();
-    genann_view_position_set(
-        net_viewers[net_viewers_num], (Vector2) { 0., -2000. }
-    );
-    net_viewers_num++;
-    */
-
-    net_viewers[net_viewers_num] = genann_view_new("xor");
-    ann_xor = ann_get_xor();
-    genann_view_prepare(net_viewers[net_viewers_num], ann_xor);
-    genann_view_position_set(
-        net_viewers[net_viewers_num], (Vector2) { 0., -2000. }
-    );
-    net_viewers_num++;
-
-    net_viewers[net_viewers_num] = genann_view_new("div");
-    ann_div = ann_get_div();
-    genann_view_prepare(net_viewers[net_viewers_num], ann_div);
-    genann_view_position_set(
-        net_viewers[net_viewers_num], (Vector2) { 0., -3000. }
-    );
-    net_viewers_num++;
+    anns_init();
 
     SetTargetFPS(60);
 
@@ -259,10 +257,12 @@ int main(void) {
     }
 
     CloseWindow();
-    genann_view_free(net_viewers[0]);
+    genann_view_free(viewers[0]);
 
     viewers_free();
+    genann_free(ann_test);
     genann_free(ann_xor);
     genann_free(ann_div);
+    logger_shutdown();
     return 0;
 }

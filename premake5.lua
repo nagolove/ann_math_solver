@@ -46,6 +46,7 @@ workspace "ray_example"
             'genann',
             'utf8proc',
             'caustic', 
+            'smallregex',
             'm'
         })
         --]]
