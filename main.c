@@ -21,17 +21,46 @@
 #include "logger.h"
 
 #define MAX_VIEVERS_NUM 4
+
 static genann_view *viewers[MAX_VIEVERS_NUM] = {0};
 static int viewers_num = 0;
 
-static genann *ann_xor = NULL;
-static genann *ann_div = NULL;
-static genann *ann_test = NULL;
+struct AnnHolder;
+
+typedef const char *(*AnnRun)(struct AnnHolder *ah, float a, float b);
+
+struct AnnHolder {
+    genann  *ann;
+    char    name[40];
+    AnnRun  run;
+};
+
+static struct AnnHolder holders[MAX_VIEVERS_NUM] = {0};
+
+//static genann *ann_xor = NULL;
+//static genann *ann_div = NULL;
+//static genann *ann_test = NULL;
 
 static const int screen_width = 1920;
 static const int screen_height = 1080;
 
 static Camera2D camera = { 0 };
+
+void holders_shutdown() {
+    for (int i = 0; i < viewers_num; ++i) {
+        genann_free(holders[i].ann);
+    }
+}
+
+struct AnnHolder *holders_search(const char *name) {
+    assert(name);
+    for (int i = 0; i < viewers_num; ++i) {
+        if (!strcmp(holders[i].name, name)) {
+            return &holders[i];
+        }
+    }
+    return NULL;
+}
 
 Vector2 place_center(const char *text, int fontsize) {
     float width = MeasureText(text, fontsize);
@@ -151,39 +180,58 @@ genann_view *printing_test() {
     return view;
 }
 
-static bool xor_input_mode = true;
-static char xor_input[50] = {0};
-static char xor_result[50] = {0};
+static bool input_mode = true;
+static char input[50] = {0};
+static char result[50] = {0};
 
-void xor_input_process() {
-    Rectangle xor_bounds = {
-        100, 100, 400, 80,
+void input_text() {
+    Rectangle bounds = {
+        100, 400, 400, 80,
     };
-    if (GuiTextBox(xor_bounds, xor_input, sizeof(xor_input), xor_input_mode)) {
+    const int font_size = 20;
+
+    DrawText(
+        "enter ann name and two arguments",
+        bounds.x, bounds.y - font_size,
+        font_size,
+        BLACK
+    );
+
+    if (GuiTextBox(bounds, input, sizeof(input), input_mode)) {
         printf("enter\n");
         int a = 0;
         int b = 0;
-        assert(ann_xor);
-        if (sscanf(xor_input, "%d %d", &a, &b) == 2) {
-            double inputs[2] = { a, b };
-            const double *outputs = genann_run(ann_xor, inputs);
-            printf("outputs[0] %f\n", outputs[0]);
-            printf("outputs[1] %f\n", outputs[1]);
+        char ann_name[32] = {0};
+
+        if (sscanf(input, "%30s %d %d", (char*)ann_name, &a, &b) == 3) {
+            struct AnnHolder *ah = holders_search(ann_name);
+            if (!ah)
+                return;
+
+            const char *str_result = ah->run(ah, a, b);
+
+            //double inputs[2] = { a, b };
+            //const double *outputs = genann_run(ann_xor, inputs);
+            //printf("outputs[0] %f\n", outputs[0]);
+            //printf("outputs[1] %f\n", outputs[1]);
+
             /*
                if (outputs[0] > 0.5) {
-               strcpy(xor_result, "0");
+               strcpy(result, "0");
                } else {
-               strcpy(xor_result, "1");
+               strcpy(result, "1");
                }
                */
-            sprintf(xor_result, "%.1f", outputs[0]);
+
+            //sprintf(result, "%.1f", outputs[0]);
+            strcpy(result, str_result);
         } else {
-            strcpy(xor_result, "0");
+            strcpy(result, "undefined");
         }
     }
 
     DrawText(
-        xor_result, xor_bounds.x + xor_bounds.width * 1.5, 100, 20, BLACK
+        result, bounds.x + bounds.width * 1.1, bounds.y, font_size, BLACK
     );
 }
 
@@ -201,7 +249,7 @@ void update() {
         genann_view_update(viewers[i], mouse_point);
     }
 
-    /*xor_input_process();*/
+    input_text();
 
     /*printf("xor_input: %s\n", xor_input);*/
 
@@ -216,37 +264,83 @@ void viewers_free() {
         genann_view_free(viewers[j]);
 }
 
+void ann_add(const char *name, genann *ann, Vector2 pos, AnnRun run) {
+    assert(name);
+    assert(ann);
+    assert(viewers_num < MAX_VIEVERS_NUM);
+
+    viewers[viewers_num] = genann_view_new(name);
+    genann_view_position_set(
+        viewers[viewers_num], pos
+    );
+    genann_view_prepare(viewers[viewers_num], ann);
+    holders[viewers_num].ann = ann;
+    holders[viewers_num].run = run;
+    strcpy(holders[viewers_num].name, name);
+    viewers_num++;
+}
+
+const char * ann_run_test(struct AnnHolder *ah, float a, float b) {
+    const double inputs[2] = { a, b};
+    const double *outputs = genann_run(ah->ann, inputs);
+    static char buf[256] = {0};
+    char *buf_ptr = buf;
+    for (int i = 0; i < ah->ann->outputs; i++) {
+        buf_ptr += sprintf(buf_ptr, "%f ", outputs[i]);
+    }
+    return buf;
+}
+
+const char * ann_run_xor(struct AnnHolder *ah, float a, float b) {
+    const double inputs[2] = { a, b};
+    const double *outputs = genann_run(ah->ann, inputs);
+    static char buf[256] = {0};
+    char *buf_ptr = buf;
+    for (int i = 0; i < ah->ann->outputs; i++) {
+        buf_ptr += sprintf(buf_ptr, "%f ", outputs[i]);
+    }
+    return buf;
+}
+
+const char * ann_run_div(struct AnnHolder *ah, float a, float b) {
+    const double inputs[2] = { a, b};
+    const double *outputs = genann_run(ah->ann, inputs);
+    static char buf[256] = {0};
+    char *buf_ptr = buf;
+    for (int i = 0; i < ah->ann->outputs; i++) {
+        buf_ptr += sprintf(buf_ptr, "%f ", outputs[i]);
+    }
+    return buf;
+}
+
 void anns_init() {
-    viewers[viewers_num] = genann_view_new("test[5,3,5,4]");
-    ann_test = genann_init(5, 3, 5, 4);
-    genann_view_position_set(
-        viewers[viewers_num], (Vector2) { 0., 0. }
+    ann_add(
+        "test",
+        genann_init(5, 3, 5, 4),
+        (Vector2) { 0., 0. },
+        ann_run_test
     );
-    genann_view_prepare(viewers[viewers_num], ann_test);
-    viewers_num++;
 
-    viewers[viewers_num] = genann_view_new("xor");
-    ann_xor = ann_get_xor();
-    genann_view_position_set(
-            viewers[viewers_num], (Vector2) { 1000., -300. }
+    ann_add(
+        "xor",
+        ann_get_xor(),
+        (Vector2) { 300., -300. },
+        ann_run_xor
     );
-    genann_view_prepare(viewers[viewers_num], ann_xor);
-    viewers_num++;
 
-    viewers[viewers_num] = genann_view_new("div");
-    ann_div = ann_get_div();
-    genann_view_position_set(
-            viewers[viewers_num], (Vector2) { -100., -800. }
+    ann_add(
+        "div",
+        ann_get_div(),
+        (Vector2) { -200., -500. },
+        ann_run_div
     );
-    genann_view_prepare(viewers[viewers_num], ann_div);
-    viewers_num++;
 }
 
 int main(void) {
     camera.zoom = 1.0f;
     srand(time(NULL));
     logger_init();
-    InitWindow(screen_width, screen_height, "2048");
+    InitWindow(screen_width, screen_height, "Персетрончики как лимончики");
 
     anns_init();
 
@@ -260,9 +354,7 @@ int main(void) {
     genann_view_free(viewers[0]);
 
     viewers_free();
-    genann_free(ann_test);
-    genann_free(ann_xor);
-    genann_free(ann_div);
+    holders_shutdown();
     logger_shutdown();
     return 0;
 }
