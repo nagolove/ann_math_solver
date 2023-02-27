@@ -2175,7 +2175,10 @@ bool GuiTextBox(Rectangle bounds, char *text, int textSize, bool editMode)
         while ((textWidth >= textBounds.width) && (text[0] != '\0'))
         {
             int codepointSize = 0;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wimplicit-function-declaration"
             GetCodepointNext(text, &codepointSize);
+#pragma GCC diagnostic pop
             text += codepointSize;
             textWidth = GetTextWidth(text);
             cursor.x = textBounds.x + textWidth + 2;
@@ -2410,7 +2413,8 @@ bool GuiTextBoxMulti(Rectangle bounds, char *text, int textSize, bool editMode)
             int codepoint = GetCharPressed();
             int textLength = (int)strlen(text);     // Length in bytes (UTF-8 string)
             int byteSize = 0;
-            const char *textUTF8 = CodepointToUTF8(codepoint, &byteSize);
+            //const char *textUTF8 = 
+            CodepointToUTF8(codepoint, &byteSize);
 
             // Introduce characters
             if ((textLength + byteSize) < textSize)
@@ -3945,13 +3949,13 @@ const char **GetTextLines(const char *text, int *count)
     lines[0] = text;
     int len = 0;
     *count = 1;
-    int lineSize = 0;   // Stores current line size, not returned
+    //int lineSize = 0;   // Stores current line size, not returned
 
     for (int i = 0, k = 0; (i < textSize) && (*count < RAYGUI_MAX_TEXT_LINES); i++)
     {
         if (text[i] == '\n')
         {
-            lineSize = len;
+            //lineSize = len;
             k++;
             lines[k] = &text[i + 1];     // WARNING: next value is valid?
             len = 0;
