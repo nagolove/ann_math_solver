@@ -14,11 +14,11 @@
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
 
-#include "mathops.h"
-#include "genann_view.h"
 #include "genann.h"
+#include "koh_genann_view.h"
+#include "koh_logger.h"
+#include "mathops.h"
 #include "xor.h"
-#include "logger.h"
 
 #define MAX_VIEVERS_NUM 4
 

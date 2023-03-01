@@ -7,10 +7,11 @@ workspace "ray_example"
     configurations { "Debug", "Release" }
 
     defines{"GRAPHICS_API_OPENGL_43"}
-    includedirs(caustic.libdirs)
+    includedirs(caustic.includedirs)
+
     includedirs { 
-        "Chipmunk2d/include/",
-        "Chipmunk2d/include/include",
+        --"Chipmunk2d/include/",
+        --"Chipmunk2d/include/include",
         "../caustic/src",
     }
     buildoptions { 
@@ -40,6 +41,7 @@ workspace "ray_example"
         --links(caustic.links)
         --links('caustic')
         --links(caustic.links_internal)
+
         links({
             'raylib',
             'chipmunk',
